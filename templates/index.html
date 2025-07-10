@@ -4,63 +4,90 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>油井压力流量数据可视化</title>
-    <!-- Tailwind CSS-->
+    <!-- 引入Tailwind CSS框架，用于快速样式设计 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- ECharts-->
+    
+    <!-- 引入ECharts图表库，用于数据可视化 -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
-    <!-- 日期选择器 -->
+    
+    <!-- 引入Flatpickr日期选择器 -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
 </head>
-<body class="bg-gray-100">
-    <div class="container mx-auto px-4 py-8">
-        <h1 class="text-3xl font-bold text-center mb-8">油井压力流量数据可视化</h1>
+<body class="bg-gray-100 min-h-screen">
+    <!-- 主容器：全屏高度，无边距 -->
+    <div class="h-screen flex flex-col">
+        <!-- 页面标题 -->
+        <h1 class="text-3xl font-bold text-center py-4 bg-white shadow-sm">油井压力流量数据可视化</h1>
         
-        <!-- 主要内容区域：左右分栏布局 -->
-        <div class="flex gap-6">
-            <!-- 左侧控制面板 -->
-            <div class="w-[15%] min-w-64">
-                <div class="bg-white rounded-lg shadow-md p-8 sticky top-4">
-                    <h2 class="text-xl font-semibold mb-6">数据筛选</h2>
+        <!-- 主要内容区域：左右分栏布局，占满剩余高度 -->
+        <div class="flex flex-1 gap-2">
+            <!-- 左侧控制面板：固定15%宽度 -->
+            <div class="w-[15%] min-w-[250px] bg-white shadow-md">
+                <div class="p-4 h-full overflow-y-auto">
+                    <h2 class="text-lg font-semibold mb-4">数据筛选</h2>
                     
                     <!-- 日期选择器 -->
-                    <div class="mb-8">
-                        <label class="block text-sm font-medium text-gray-700 mb-3">选择日期</label>
-                        <input type="text" id="date-picker" class="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">选择日期</label>
+                        <input type="text" id="date-picker" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
                     
                     <!-- 时间范围选择器 -->
-                    <div class="mb-8">
-                        <label class="block text-sm font-medium text-gray-700 mb-3">时间范围</label>
-                        <div class="space-y-4">
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">时间范围</label>
+                        <div class="space-y-2">
                             <!-- 开始时间 -->
-                            <input type="time" id="start-time" class="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="开始时间">
-                            <div class="text-center text-gray-500 text-sm py-1">至</div>
+                            <input type="time" id="start-time" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="开始时间">
+                            <div class="text-center text-gray-500 text-xs py-1">至</div>
                             <!-- 结束时间 -->
-                            <input type="time" id="end-time" class="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="结束时间">
+                            <input type="time" id="end-time" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="结束时间">
+                        </div>
+                    </div>
+                    
+                    <!-- 标注选择器 -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">异常标注</label>
+                        <div class="space-y-2">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="anno-checkbox" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                                <span class="text-sm text-gray-700">异常事件标注</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="iforest-checkbox" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
+                                <span class="text-sm text-gray-700">iForest异常检测</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="kmean-checkbox" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <span class="text-sm text-gray-700">K-Means聚类异常</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="lstm-ad-checkbox" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <span class="text-sm text-gray-700">LSTM异常检测</span>
+                            </label>
                         </div>
                     </div>
                     
                     <!-- 操作按钮 -->
-                    <div class="space-y-4">
+                    <div class="space-y-3">
                         <!-- 应用筛选按钮 -->
-                        <button id="filter-btn" class="w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
+                        <button id="filter-btn" class="w-full px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors text-sm">
                             应用筛选
                         </button>
                         <!-- 重置筛选按钮 -->
-                        <button id="reset-btn" class="w-full px-4 py-3 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors">
+                        <button id="reset-btn" class="w-full px-3 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors text-sm">
                             重置筛选
                         </button>
                     </div>
                 </div>
             </div>
             
-            <!-- 右侧图表区域 -->
-            <div class="flex-1">
-                <div class="bg-white rounded-lg shadow-md p-6">
-                    <!-- ECharts图表容器 -->
-                    <div id="chart" class="w-full" style="height: 600px;"></div>
+            <!-- 右侧图表区域：占据剩余85%宽度 -->
+            <div class="flex-1 bg-white shadow-md">
+                <div class="h-full p-4">
+                    <!-- ECharts图表容器：占满整个容器 -->
+                    <div id="chart" class="w-full h-full"></div>
                 </div>
             </div>
         </div>
@@ -71,13 +98,16 @@
         const chartDom = document.getElementById('chart');
         const myChart = echarts.init(chartDom);
         
+        // 存储当前的标注数据
+        let currentAnnotations = [];
+        
         // ECharts图表配置选项
         let option = {
             title: {
                 text: '油井压力流量数据'
             },
             tooltip: {
-                trigger: 'axis',
+                trigger: 'axis',  // 坐标轴触发
                 axisPointer: {
                     animation: false  // 关闭动画以提高性能
                 }
@@ -95,7 +125,7 @@
                 type: 'value',
                 name: '数值'
             },
-            animation: false,
+            animation: false,  // 关闭动画以提高大数据量时的性能
             series: [
                 // 8井油压数据系列
                 { 
@@ -161,7 +191,9 @@
                     end: 100,
                     throttle: 50
                 }
-            ]
+            ],
+            // 图形标注配置
+            graphic: []
         };
         
         // 应用图表配置
@@ -177,6 +209,8 @@
             onChange: function(selectedDates, dateStr) {
                 // 当选择日期时的回调函数
                 updateTimeSelectors();
+                // 重新加载标注数据
+                loadAnnotations();
             }
         });
 
@@ -223,9 +257,171 @@
                         datePicker.setDate(data.dates[0]);
                         updateTimeSelectors();
                         loadData();  // 加载默认日期的数据
+                        loadAnnotations(); // 加载标注数据
                     }
                 })
                 .catch(error => console.error('获取日期范围出错:', error));
+        }
+        
+        /**
+         * 加载标注数据
+         * 根据当前选择的日期获取相应的标注信息
+         */
+        function loadAnnotations() {
+            const dateInput = document.getElementById('date-picker').value;
+            if (!dateInput) return;
+            
+            console.log('正在加载标注数据，日期:', dateInput);
+            
+            fetch(`/get_annotations?date=${encodeURIComponent(dateInput)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('获取标注数据失败:', data.error);
+                        return;
+                    }
+                    
+                    currentAnnotations = data.annotations || [];
+                    console.log('加载标注数据成功:', currentAnnotations.length, '条');
+                    console.log('标注详情:', currentAnnotations);
+                    updateAnnotations();
+                })
+                .catch(error => {
+                    console.error('获取标注数据出错:', error);
+                });
+        }
+        
+        /**
+         * 更新图表上的标注
+         * 根据当前的标注数据和用户选择更新图表显示
+         */
+        function updateAnnotations() {
+            // 获取选中的标注类型
+            const selectedTypes = [];
+            if (document.getElementById('anno-checkbox').checked) selectedTypes.push('anno');
+            if (document.getElementById('iforest-checkbox').checked) selectedTypes.push('iforest');
+            if (document.getElementById('kmean-checkbox').checked) selectedTypes.push('kmean');
+            if (document.getElementById('lstm-ad-checkbox').checked) selectedTypes.push('lstm-ad');
+            
+            console.log('选中的标注类型:', selectedTypes);
+            
+            // 清除现有的标注
+            option.series[0].markArea = { data: [] };
+            option.series[0].markLine = { data: [] };
+            
+            if (selectedTypes.length === 0 || !currentAnnotations || currentAnnotations.length === 0) {
+                myChart.setOption(option, true);
+                console.log('标注已更新: 0 个区域, 0 条线');
+                return;
+            }
+            
+            // 获取当前图表显示的时间范围
+            const chartData = option.xAxis.data;
+            let minTime = null;
+            let maxTime = null;
+            let timeOffset = 0;
+            
+            if (chartData && chartData.length > 0) {
+                minTime = Math.min(...chartData);
+                maxTime = Math.max(...chartData);
+                timeOffset = minTime; // 时间偏移量
+                console.log('图表时间范围:', minTime, '-', maxTime, '偏移量:', timeOffset);
+            }
+            
+            // 过滤并处理标注数据
+            let filteredAnnotations = currentAnnotations.filter(ann => selectedTypes.includes(ann.type));
+            
+            // 如果图表有数据，根据图表的实际时间范围过滤标注
+            if (minTime !== null && maxTime !== null) {
+                filteredAnnotations = filteredAnnotations.filter(annotation => {
+                    const annStart = annotation.start;
+                    const annEnd = annotation.end;
+                    
+                    // 如果标注没有时间信息，跳过
+                    if (annStart === null && annEnd === null) return false;
+                    
+                    // 检查标注是否与图表显示范围有交集
+                    const annotationMinTime = annStart !== null ? annStart : annEnd;
+                    const annotationMaxTime = annEnd !== null ? annEnd : annStart;
+                    
+                    // 标注与图表时间范围有交集
+                    const hasOverlap = annotationMaxTime >= minTime && annotationMinTime <= maxTime;
+                    
+                    console.log(`标注 ${annotation.label}: ${annotationMinTime}-${annotationMaxTime}, 图表范围: ${minTime}-${maxTime}, 重叠: ${hasOverlap}`);
+                    
+                    return hasOverlap;
+                });
+                
+                console.log('过滤后的标注数量:', filteredAnnotations.length);
+            }
+            
+            const markAreas = [];
+            const markLines = [];
+            
+            filteredAnnotations.forEach(annotation => {
+                // 定义颜色映射
+                const colorMap = {
+                    'anno': '#ff6b6b',
+                    'iforest': '#4ecdc4', 
+                    'kmean': '#45b7d1',
+                    'lstm-ad': '#96ceb4'
+                };
+                
+                const color = colorMap[annotation.type] || '#cccccc';
+                
+                if (annotation.start !== null && annotation.end !== null && annotation.start !== annotation.end) {
+                    // 区域标注 - 调整坐标相对于当前显示范围
+                    const adjustedStart = annotation.start - timeOffset;
+                    const adjustedEnd = annotation.end - timeOffset;
+                    
+                    markAreas.push([
+                        {
+                            name: annotation.label,
+                            xAxis: adjustedStart,
+                            itemStyle: { color: color, opacity: 0.3 }
+                        },
+                        {
+                            xAxis: adjustedEnd
+                        }
+                    ]);
+                    
+                    console.log(`区域标注 ${annotation.label}: 原始(${annotation.start}-${annotation.end}) -> 调整后(${adjustedStart}-${adjustedEnd})`);
+                } else {
+                    // 单点标注 - 调整坐标相对于当前显示范围
+                    const xValue = annotation.start || annotation.end;
+                    if (xValue !== null) {
+                        const adjustedX = xValue - timeOffset;
+                        
+                        markLines.push({
+                            name: annotation.label,
+                            xAxis: adjustedX,
+                            lineStyle: { color: color, width: 2 },
+                            label: {
+                                formatter: annotation.label,
+                                position: 'end'
+                            }
+                        });
+                        
+                        console.log(`单点标注 ${annotation.label}: 原始(${xValue}) -> 调整后(${adjustedX})`);
+                    }
+                }
+            });
+            
+            // 应用标注到图表
+            if (markAreas.length > 0 || markLines.length > 0) {
+                option.series[0].markArea = {
+                    silent: true,
+                    data: markAreas
+                };
+                option.series[0].markLine = {
+                    silent: true,
+                    data: markLines
+                };
+            }
+            
+            // 更新图表
+            myChart.setOption(option, true);
+            console.log('标注已更新:', markAreas.length, '个区域,', markLines.length, '条线');
         }
         
         /**
@@ -295,6 +491,8 @@
                     
                     // 更新图表
                     updateChart(data);
+                    // 更新标注
+                    updateAnnotations();
                     hideLoadingState();
                 })
                 .catch(error => {
@@ -390,6 +588,11 @@
             });  
         });
 
+        // 绑定复选框事件
+        document.getElementById('anno-checkbox').addEventListener('change', updateAnnotations);
+        document.getElementById('iforest-checkbox').addEventListener('change', updateAnnotations);
+        document.getElementById('kmean-checkbox').addEventListener('change', updateAnnotations);
+        document.getElementById('lstm-ad-checkbox').addEventListener('change', updateAnnotations);
         // 绑定"应用筛选"按钮事件
         document.getElementById('filter-btn').addEventListener('click', loadData);
 
@@ -410,12 +613,15 @@
                     const datePicker = document.getElementById('date-picker')._flatpickr;
                     document.getElementById('start-time').value = '';
                     document.getElementById('end-time').value = '';
+                    document.getElementById('anno-checkbox').checked = true;
+                    document.getElementById('iforest-checkbox').checked = true;
                     
                     // 设置默认日期并加载数据
                     if (data.dates && data.dates.length > 0) {
                         datePicker.setDate(data.dates[0]);
                         updateTimeSelectors();
                         loadData();
+                        loadAnnotations();
                     } else {
                         datePicker.clear();
                         loadData();
@@ -428,6 +634,8 @@
                     datePicker.clear();
                     document.getElementById('start-time').value = '';
                     document.getElementById('end-time').value = '';
+                    document.getElementById('anno-checkbox').checked = true;
+                    document.getElementById('iforest-checkbox').checked = true;
                     loadData(); 
                 });
         });

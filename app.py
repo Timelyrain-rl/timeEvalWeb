@@ -22,21 +22,70 @@ DATA_FILE = os.path.join('timeEvalWebData', 'month_3_processed.csv')
 GLOBAL_DATA = None  # 存储完整的数据集
 DATE_RANGE = None   # 存储可用的日期范围列表
 
+# 在文件开头添加新的全局变量
+ANNO_DATA = None    # 存储异常标注数据
+IFOREST_DATA = None # 存储iForest异常检测数据
+KMEAN_DATA = None    # 存储K-Means异常检测数据
+LSTM_AD_DATA = None  # 存储LSTM异常检测数据
+
+# 修改load_data_to_memory函数
 def load_data_to_memory():
     """
     应用启动时预加载数据到内存
     
     将CSV文件中的数据加载到内存中，并进行必要的数据类型转换和预处理。
-    这样可以避免每次查询时都读取文件，提高响应速度。
+    这样可以避免每次查询时都读取文件，大大提高响应速度。
     
     Returns:
         bool: 数据加载是否成功
     """
-    global GLOBAL_DATA, DATE_RANGE
+    global GLOBAL_DATA, DATE_RANGE, ANNO_DATA, IFOREST_DATA, KMEAN_DATA, LSTM_AD_DATA
     try:
         print("正在加载数据到内存...")
-        # 读取CSV文件
+        # 读取主要数据CSV文件
         GLOBAL_DATA = pd.read_csv(DATA_FILE)
+        
+        # 读取标注数据
+        anno_file = os.path.join('timeEvalWebData', 'anno_data.csv')
+        iforest_file = os.path.join('timeEvalWebData', 'iForest.csv')
+        
+        if os.path.exists(anno_file):
+            ANNO_DATA = pd.read_csv(anno_file)
+            # 处理日期格式
+            ANNO_DATA['日期'] = pd.to_datetime(ANNO_DATA['日期']).dt.strftime('%Y-%m-%d')
+            print(f"标注数据加载完成，共 {len(ANNO_DATA)} 条记录")
+        else:
+            print("标注数据文件不存在")
+            ANNO_DATA = pd.DataFrame()
+            
+        if os.path.exists(iforest_file):
+            IFOREST_DATA = pd.read_csv(iforest_file)
+            # 处理日期格式
+            IFOREST_DATA['日期'] = pd.to_datetime(IFOREST_DATA['日期']).dt.strftime('%Y-%m-%d')
+            print(f"iForest数据加载完成，共 {len(IFOREST_DATA)} 条记录")
+        else:
+            print("iForest数据文件不存在")
+            IFOREST_DATA = pd.DataFrame()
+        
+        # 读取K-Means数据
+        kmean_file = os.path.join('timeEvalWebData', 'kmean.csv')
+        if os.path.exists(kmean_file):
+            KMEAN_DATA = pd.read_csv(kmean_file)
+            KMEAN_DATA['日期'] = pd.to_datetime(KMEAN_DATA['日期']).dt.strftime('%Y-%m-%d')
+            print(f"K-Means数据加载成功: {len(KMEAN_DATA)} 条记录")
+        else:
+            KMEAN_DATA = pd.DataFrame()
+            print("K-Means数据文件不存在")
+        
+        # 读取LSTM-AD数据
+        lstm_ad_file = os.path.join('timeEvalWebData', 'lstm_ad.csv')
+        if os.path.exists(lstm_ad_file):
+            LSTM_AD_DATA = pd.read_csv(lstm_ad_file)
+            LSTM_AD_DATA['日期'] = pd.to_datetime(LSTM_AD_DATA['日期']).dt.strftime('%Y-%m-%d')
+            print(f"LSTM-AD数据加载成功: {len(LSTM_AD_DATA)} 条记录")
+        else:
+            LSTM_AD_DATA = pd.DataFrame()
+            print("LSTM-AD数据文件不存在")
         
         # 处理日期列：转换为标准格式并提取唯一日期
         if '日期' in GLOBAL_DATA.columns:
@@ -57,6 +106,120 @@ def load_data_to_memory():
     except Exception as e:
         print(f"数据加载失败: {e}")
         return False
+
+# 添加新的API接口获取标注数据
+@app.route('/get_annotations')
+def get_annotations():
+    """
+    获取指定日期的标注数据API接口
+    
+    根据日期参数返回该日期的异常标注和iForest检测结果。
+    
+    Returns:
+        Response: JSON格式的标注数据
+    """
+    try:
+        if ANNO_DATA is None or IFOREST_DATA is None or KMEAN_DATA is None or LSTM_AD_DATA is None:
+            if not load_data_to_memory():
+                return jsonify({'error': '数据加载失败，请检查数据文件'})
+        
+        date = request.args.get('date')
+        if not date:
+            return jsonify({'error': '缺少日期参数'})
+        
+        # 获取指定日期的标注数据
+        anno_filtered = ANNO_DATA[ANNO_DATA['日期'] == date] if not ANNO_DATA.empty else pd.DataFrame()
+        iforest_filtered = IFOREST_DATA[IFOREST_DATA['日期'] == date] if not IFOREST_DATA.empty else pd.DataFrame()
+        kmean_filtered = KMEAN_DATA[KMEAN_DATA['日期'] == date] if not KMEAN_DATA.empty else pd.DataFrame()
+        lstm_ad_filtered = LSTM_AD_DATA[LSTM_AD_DATA['日期'] == date] if not LSTM_AD_DATA.empty else pd.DataFrame()
+        
+        # 处理标注数据
+        annotations = []
+        
+        # 处理anno_data中的标注
+        for _, row in anno_filtered.iterrows():
+            annotation = {
+                'type': 'anno',
+                'start': int(row['每日对应秒序号起始']) if pd.notna(row['每日对应秒序号起始']) else None,
+                'end': int(row['每日对应秒序号结束']) if pd.notna(row['每日对应秒序号结束']) else None,
+                'label': str(row['异常类型']) if pd.notna(row['异常类型']) else '',
+                'date': row['日期']
+            }
+            annotations.append(annotation)
+        
+        # 处理iForest中的标注
+        for _, row in iforest_filtered.iterrows():
+            anomaly_type = str(row['异常类型']) if pd.notna(row['异常类型']) and str(row['异常类型']).strip() != '' else ''
+            if anomaly_type:
+                label = f'iForest-{anomaly_type}'
+            else:
+                label = 'iForest'
+            
+            annotation = {
+                'type': 'iforest',
+                'start': int(row['每日对应秒序号起始']) if pd.notna(row['每日对应秒序号起始']) else None,
+                'end': int(row['每日对应秒序号结束']) if pd.notna(row['每日对应秒序号结束']) else None,
+                'label': label,
+                'date': row['日期']
+            }
+            annotations.append(annotation)
+        
+        # 处理K-Means中的标注
+        for _, row in kmean_filtered.iterrows():
+            anomaly_type = str(row['异常类型']) if pd.notna(row['异常类型']) and str(row['异常类型']).strip() != '' else ''
+            if anomaly_type:
+                label = f'K-Means-{anomaly_type}'
+            else:
+                label = 'K-Means'
+            
+            annotation = {
+                'type': 'kmean',
+                'start': int(row['每日对应秒序号起始']) if pd.notna(row['每日对应秒序号起始']) else None,
+                'end': int(row['每日对应秒序号结束']) if pd.notna(row['每日对应秒序号结束']) else None,
+                'label': label,
+                'date': row['日期']
+            }
+            annotations.append(annotation)
+        
+        # 处理LSTM-AD中的标注
+        for _, row in lstm_ad_filtered.iterrows():
+            anomaly_type = str(row['异常类型']) if pd.notna(row['异常类型']) and str(row['异常类型']).strip() != '' else ''
+            if anomaly_type:
+                label = f'LSTM-{anomaly_type}'
+            else:
+                label = 'LSTM'
+            
+            annotation = {
+                'type': 'lstm-ad',
+                'start': int(row['每日对应秒序号起始']) if pd.notna(row['每日对应秒序号起始']) else None,
+                'end': int(row['每日对应秒序号结束']) if pd.notna(row['每日对应秒序号结束']) else None,
+                'label': label,
+                'date': row['日期']
+            }
+            annotations.append(annotation)
+        
+        return jsonify({'annotations': annotations})
+    except Exception as e:
+        print(f"获取标注数据时出错: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)})
+
+# 修改cleanup函数
+def cleanup():
+    """
+    应用关闭时的清理工作
+    
+    释放内存中的数据，确保应用优雅关闭。
+    """
+    global GLOBAL_DATA, DATE_RANGE, ANNO_DATA, IFOREST_DATA, KMEAN_DATA, LSTM_AD_DATA
+    GLOBAL_DATA = None
+    DATE_RANGE = None
+    ANNO_DATA = None
+    IFOREST_DATA = None
+    KMEAN_DATA = None
+    LSTM_AD_DATA = None
+    print("应用关闭，内存已清理")
 
 def get_filtered_data(date, start_hour, end_hour, start_minute, end_minute):
     """
