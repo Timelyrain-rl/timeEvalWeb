@@ -11,6 +11,7 @@ import pandas as pd
 import os
 import json
 import atexit
+import models.abnomal as abnomal
 
 # 创建Flask应用实例
 app = Flask(__name__)
@@ -266,6 +267,7 @@ def get_filtered_data(date, start_hour, end_hour, start_minute, end_minute):
             print("日期筛选后没有数据，返回空结果")
             return {
                 'time': [],
+                'time_formatted': [],
                 '8井油压': [],
                 '8井套压': [],
                 '9井压力': [],
@@ -334,6 +336,7 @@ def get_filtered_data(date, start_hour, end_hour, start_minute, end_minute):
         print("筛选后没有数据")
         return {
             'time': [],
+            'time_formatted': [],
             '8井油压': [],
             '8井套压': [],
             '9井压力': [],
@@ -341,9 +344,33 @@ def get_filtered_data(date, start_hour, end_hour, start_minute, end_minute):
             '8/9井压力差值': []
         }
     
+    # 将秒序号转换为时:分:秒格式
+    def seconds_to_time_format(seconds, date):
+        # 根据日期确定起始时间偏移量
+        if date == '2021-03-14':
+            # 2021-3-14从16:00:00开始，即从57600秒开始（16*3600）
+            start_offset = 16 * 3600
+        else:
+            # 其他日期从0:00:00开始
+            start_offset = 0
+        
+        # 计算总秒数
+        total_seconds = int(seconds) + start_offset
+        
+        # 计算小时、分钟、秒
+        hours = (total_seconds // 3600) % 24  # 取模24确保在0-23范围内
+        minutes = (total_seconds % 3600) // 60
+        secs = total_seconds % 60
+        
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+    
+    # 生成格式化的时间列表
+    time_formatted = [seconds_to_time_format(sec, target_date) for sec in filtered_df['每日对应秒序号'].tolist()]
+    
     # 构建返回结果
     result = {
-        'time': filtered_df['每日对应秒序号'].tolist(),
+        'time': filtered_df['每日对应秒序号'].tolist(),  # 保留原始秒序号用于内部计算
+        'time_formatted': time_formatted,  # 新增格式化时间用于显示
         '8井油压': filtered_df['8井油压'].tolist(),
         '8井套压': filtered_df['8井套压'].tolist(),
         '9井压力': filtered_df['9井压力'].tolist(),
@@ -493,6 +520,7 @@ atexit.register(cleanup)
 
 # 应用入口点
 if __name__ == '__main__':
+
     print("启动应用...")
-    load_data_to_memory()  # 预加载数据
-    app.run(debug=True)    # 启动Flask开发服务器
+    load_data_to_memory()
+    app.run(debug=True)

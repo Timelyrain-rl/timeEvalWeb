@@ -119,7 +119,7 @@
             xAxis: {
                 type: 'category',
                 data: [],  // 将由数据动态填充
-                name: '每日对应秒序号'
+                name: '时间'  // 修改横轴名称为"时间"
             },
             yAxis: {
                 type: 'value',
@@ -291,6 +291,10 @@
                 });
         }
         
+        // 存储当前的标注数据和原始时间数据
+// 删除重复声明的currentAnnotations变量，因为它已在前面声明过
+        let currentTimeData = [];  // 新增：存储原始秒序号数据
+        
         /**
          * 更新图表上的标注
          * 根据当前的标注数据和用户选择更新图表显示
@@ -315,15 +319,14 @@
                 return;
             }
             
-            // 获取当前图表显示的时间范围
-            const chartData = option.xAxis.data;
+            // 获取当前图表显示的时间范围（使用原始秒序号数据）
             let minTime = null;
             let maxTime = null;
             let timeOffset = 0;
             
-            if (chartData && chartData.length > 0) {
-                minTime = Math.min(...chartData);
-                maxTime = Math.max(...chartData);
+            if (currentTimeData && currentTimeData.length > 0) {
+                minTime = Math.min(...currentTimeData);
+                maxTime = Math.max(...currentTimeData);
                 timeOffset = minTime; // 时间偏移量
                 console.log('图表时间范围:', minTime, '-', maxTime, '偏移量:', timeOffset);
             }
@@ -358,10 +361,10 @@
             const markAreas = [];
             const markLines = [];
             
-            filteredAnnotations.forEach(annotation => {
+            filteredAnnotations.forEach((annotation, index) => {
                 // 定义颜色映射
                 const colorMap = {
-                    'anno': '#ff6b6b',
+                    'anno': '#0c1b25',
                     'iforest': '#4ecdc4', 
                     'kmean': '#45b7d1',
                     'lstm-ad': '#96ceb4'
@@ -370,39 +373,43 @@
                 const color = colorMap[annotation.type] || '#cccccc';
                 
                 if (annotation.start !== null && annotation.end !== null && annotation.start !== annotation.end) {
-                    // 区域标注 - 调整坐标相对于当前显示范围
-                    const adjustedStart = annotation.start - timeOffset;
-                    const adjustedEnd = annotation.end - timeOffset;
+                    // 区域标注 - 需要找到对应的索引位置
+                    const startIndex = currentTimeData.findIndex(time => time >= annotation.start);
+                    const endIndex = currentTimeData.findIndex(time => time >= annotation.end);
                     
-                    markAreas.push([
-                        {
-                            name: annotation.label,
-                            xAxis: adjustedStart,
-                            itemStyle: { color: color, opacity: 0.3 }
-                        },
-                        {
-                            xAxis: adjustedEnd
-                        }
-                    ]);
-                    
-                    console.log(`区域标注 ${annotation.label}: 原始(${annotation.start}-${annotation.end}) -> 调整后(${adjustedStart}-${adjustedEnd})`);
+                    if (startIndex !== -1 && endIndex !== -1) {
+                        markAreas.push([
+                            {
+                                name: annotation.label,
+                                xAxis: startIndex,
+                                itemStyle: { color: color, opacity: 0.3 }
+                            },
+                            {
+                                xAxis: endIndex
+                            }
+                        ]);
+                        
+                        console.log(`区域标注 ${annotation.label}: 原始(${annotation.start}-${annotation.end}) -> 索引(${startIndex}-${endIndex})`);
+                    }
                 } else {
-                    // 单点标注 - 调整坐标相对于当前显示范围
+                    // 单点标注 - 需要找到对应的索引位置
                     const xValue = annotation.start || annotation.end;
                     if (xValue !== null) {
-                        const adjustedX = xValue - timeOffset;
+                        const xIndex = currentTimeData.findIndex(time => time >= xValue);
                         
-                        markLines.push({
-                            name: annotation.label,
-                            xAxis: adjustedX,
-                            lineStyle: { color: color, width: 2 },
-                            label: {
-                                formatter: annotation.label,
-                                position: 'end'
-                            }
-                        });
-                        
-                        console.log(`单点标注 ${annotation.label}: 原始(${xValue}) -> 调整后(${adjustedX})`);
+                        if (xIndex !== -1) {
+                            markLines.push({
+                                name: annotation.label,
+                                xAxis: xIndex,
+                                lineStyle: { color: color, width: 2 },
+                                label: {
+                                    formatter: annotation.label,
+                                    position: 'end'
+                                }
+                            });
+                            
+                            console.log(`单点标注 ${annotation.label}: 原始(${xValue}) -> 索引(${xIndex})`);
+                        }
                     }
                 }
             });
@@ -425,51 +432,34 @@
         }
         
         /**
-         * 加载数据
-         * 根据当前的筛选条件从服务器获取数据并更新图表
+         * 加载数据并更新图表
+         * 根据当前的筛选条件从服务器获取数据并更新图表显示
          */
         function loadData() {
-            // 获取用户输入的筛选条件
+            // 获取筛选条件
             const dateInput = document.getElementById('date-picker').value;
             const startTimeInput = document.getElementById('start-time').value;
             const endTimeInput = document.getElementById('end-time').value;
             
-            // 解析时间输入
+            // 解析时间
             const startTime = parseTime(startTimeInput);
             const endTime = parseTime(endTimeInput);
             
-            // 处理日期格式
-            let date = '';
-            if (dateInput) {
-                try {
-                    if (dateInput.includes('-') && dateInput.length === 10) {
-                        date = dateInput;
-                    } else {
-                        const dateObj = new Date(dateInput);
-                        date = dateObj.toISOString().split('T')[0];
-                    }
-                } catch (e) {
-                    console.error('日期格式转换失败:', e);
-                    date = dateInput;
-                }
+            // 构建请求URL
+            let url = '/get_data';
+            const params = new URLSearchParams();
+            
+            if (dateInput) params.append('date', dateInput);
+            if (startTime.hour !== null) params.append('start_hour', startTime.hour);
+            if (startTime.minute !== null) params.append('start_minute', startTime.minute);
+            if (endTime.hour !== null) params.append('end_hour', endTime.hour);
+            if (endTime.minute !== null) params.append('end_minute', endTime.minute);
+            
+            if (params.toString()) {
+                url += '?' + params.toString();
             }
             
-            // 显示加载状态
-            showLoadingState();
-            
-            // 构建请求URL
-            let url = '/get_data?';
-            if (date) url += `date=${encodeURIComponent(date)}&`;
-            if (startTime.hour !== null) url += `start_hour=${startTime.hour}&`;
-            if (endTime.hour !== null) url += `end_hour=${endTime.hour}&`;
-            if (startTime.minute !== null) url += `start_minute=${startTime.minute}&`;
-            if (endTime.minute !== null) url += `end_minute=${endTime.minute}&`;
-            
-            // 调试信息
             console.log('请求URL:', url);
-            console.log('发送的日期:', date);
-            console.log('开始时间:', startTimeInput, '解析为:', startTime);
-            console.log('结束时间:', endTimeInput, '解析为:', endTime);
             
             // 发送请求获取数据
             fetch(url)
@@ -477,27 +467,30 @@
                 .then(data => {
                     if (data.error) {
                         console.error('获取数据失败:', data.error);
-                        hideLoadingState();
                         return;
                     }
                     
-                    console.log('获取到数据点数:', data.time ? data.time.length : 0);
+                    console.log('数据加载成功，数据点数:', data.time ? data.time.length : 0);
                     
-                    // 如果没有数据，进行调试
-                    if (!data.time || data.time.length === 0) {
-                        console.warn('没有获取到数据，可能需要检查筛选条件');
-                        debugDataStructure();
-                    }
+                    // 存储原始时间数据用于标注计算
+                    currentTimeData = data.time || [];
                     
-                    // 更新图表
-                    updateChart(data);
+                    // 更新图表配置
+                    option.xAxis.data = data.time_formatted || [];  // 使用格式化的时间
+                    option.series[0].data = data['8井油压'] || [];
+                    option.series[1].data = data['8井套压'] || [];
+                    option.series[2].data = data['9井压力'] || [];
+                    option.series[3].data = data['9井流量'] || [];
+                    option.series[4].data = data['8/9井压力差值'] || [];
+                    
+                    // 应用更新到图表
+                    myChart.setOption(option, true);
+                    
                     // 更新标注
                     updateAnnotations();
-                    hideLoadingState();
                 })
                 .catch(error => {
                     console.error('获取数据出错:', error);
-                    hideLoadingState();
                 });
         }
         
