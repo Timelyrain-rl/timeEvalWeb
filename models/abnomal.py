@@ -164,10 +164,14 @@ def remove_overlapping_intervals(intervals):
     return merged
 
 def save_results_to_csv(results, output_file="iForest.csv", df=None):
-    """将结果保存到CSV文件（增量保存，避免重复）"""
-    csv_data = []
+    """将结果保存到CSV文件（为每个方法创建单独的文件）"""
+    saved_files = []
     
     for method, intervals in results.items():
+        # 为每个方法生成不同的文件名
+        method_file = f"{method}.csv"
+        csv_data = []
+        
         for start_idx, end_idx in intervals:
             if df is not None:
                 # 从数据表中查询
@@ -223,56 +227,62 @@ def save_results_to_csv(results, output_file="iForest.csv", df=None):
                     "每日对应秒序号结束": end_seconds,
                     "异常类型": ''
                 })
-    
-    # 创建新数据的DataFrame
-    new_df = pd.DataFrame(csv_data)
-    output_path = os.path.join(os.path.dirname(__file__), "..", "timeEvalWebData", output_file)
-    
-    # 检查文件是否存在
-    if os.path.exists(output_path):
-        try:
-            existing_df = pd.read_csv(output_path, encoding='utf-8-sig')
-            logger.info(f"读取现有文件，包含 {len(existing_df)} 条记录")
-            
-            # 合并新旧数据
-            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
-            
-            # 强化去重逻辑
-            before_dedup = len(combined_df)
-            
-            # 确保数据类型一致，处理可能的空值和数据类型问题
-            combined_df['日期'] = combined_df['日期'].astype(str).str.strip()
-            combined_df['每日对应秒序号起始'] = pd.to_numeric(combined_df['每日对应秒序号起始'], errors='coerce').fillna(0).astype(int)
-            combined_df['每日对应秒序号结束'] = pd.to_numeric(combined_df['每日对应秒序号结束'], errors='coerce').fillna(0).astype(int)
-            combined_df['异常类型'] = combined_df['异常类型'].fillna('').astype(str).str.strip()
-            
-            # 基于关键列去重，使用更严格的去重策略
-            combined_df = combined_df.drop_duplicates(
-                subset=['日期', '每日对应秒序号起始', '每日对应秒序号结束'],
-                keep='first'
-            ).reset_index(drop=True)
-            
-            after_dedup = len(combined_df)
-            
-            if before_dedup > after_dedup:
-                logger.info(f"去除了 {before_dedup - after_dedup} 条重复记录")
-            
-            # 按日期和起始时间排序
-            combined_df = combined_df.sort_values(['日期', '每日对应秒序号起始'])
-            
-            # 保存合并后的数据
-            combined_df.to_csv(output_path, index=False, encoding='utf-8-sig')
-            logger.info(f"增量保存完成，总共 {len(combined_df)} 条记录（新增 {len(new_df)} 条）")
-            
-        except Exception as e:
-            logger.error(f"读取现有文件失败: {e}，将创建新文件")
+        
+        if not csv_data:
+            logger.info(f"方法 {method} 没有检测到异常，跳过文件保存")
+            continue
+        
+        # 创建新数据的DataFrame
+        new_df = pd.DataFrame(csv_data)
+        output_path = os.path.join(os.path.dirname(__file__), "..", "timeEvalWebData", method_file)
+        
+        # 检查文件是否存在
+        if os.path.exists(output_path):
+            try:
+                existing_df = pd.read_csv(output_path, encoding='utf-8-sig')
+                logger.info(f"读取现有文件 {method_file}，包含 {len(existing_df)} 条记录")
+                
+                # 合并新旧数据
+                combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+                
+                # 强化去重逻辑
+                before_dedup = len(combined_df)
+                
+                # 确保数据类型一致，处理可能的空值和数据类型问题
+                combined_df['日期'] = combined_df['日期'].astype(str).str.strip()
+                combined_df['每日对应秒序号起始'] = pd.to_numeric(combined_df['每日对应秒序号起始'], errors='coerce').fillna(0).astype(int)
+                combined_df['每日对应秒序号结束'] = pd.to_numeric(combined_df['每日对应秒序号结束'], errors='coerce').fillna(0).astype(int)
+                #combined_df['异常类型'] = combined_df['异常类型'].fillna(method).astype(str).str.strip()
+                
+                # 基于关键列去重，使用更严格的去重策略
+                combined_df = combined_df.drop_duplicates(
+                    subset=['日期', '每日对应秒序号起始', '每日对应秒序号结束'],
+                    keep='first'
+                ).reset_index(drop=True)
+                
+                after_dedup = len(combined_df)
+                
+                if before_dedup > after_dedup:
+                    logger.info(f"方法 {method}: 去除了 {before_dedup - after_dedup} 条重复记录")
+                
+                # 按日期和起始时间排序
+                combined_df = combined_df.sort_values(['日期', '每日对应秒序号起始'])
+                
+                # 保存合并后的数据
+                combined_df.to_csv(output_path, index=False, encoding='utf-8-sig')
+                logger.info(f"方法 {method}: 增量保存完成，总共 {len(combined_df)} 条记录（新增 {len(new_df)} 条）")
+                
+            except Exception as e:
+                logger.error(f"读取现有文件 {method_file} 失败: {e}，将创建新文件")
+                new_df.to_csv(output_path, index=False, encoding='utf-8-sig')
+                logger.info(f"方法 {method}: 创建新文件，保存 {len(new_df)} 条记录")
+        else:
             new_df.to_csv(output_path, index=False, encoding='utf-8-sig')
-            logger.info(f"创建新文件，保存 {len(new_df)} 条记录")
-    else:
-        new_df.to_csv(output_path, index=False, encoding='utf-8-sig')
-        logger.info(f"创建新文件，保存 {len(new_df)} 条记录")
+            logger.info(f"方法 {method}: 创建新文件，保存 {len(new_df)} 条记录")
+        
+        saved_files.append(output_path)
     
-    return output_path
+    return saved_files
 
 def ab_by_date(date_str, start_seconds=None, end_seconds=None, method=["isolateForest"], save_to_csv=True):
     """基于日期和每日对应秒序号进行异常检测"""
@@ -326,7 +336,7 @@ def ab_by_date(date_str, start_seconds=None, end_seconds=None, method=["isolateF
     return converted_result
 
 def ab(start:int, end:int, method:list, save_to_csv=True):
-    """原有的异常检测函数（基于索引）"""
+    """异常检测函数（基于索引）- 支持多种检测方法"""
     file_path = os.path.join(os.path.dirname(__file__), "..", "timeEvalWebData", "month_3_processed.csv")
     
     df = pd.read_csv(file_path)
@@ -337,20 +347,74 @@ def ab(start:int, end:int, method:list, save_to_csv=True):
     data = data.ffill(axis=0)
     data = data.reset_index()
     data = data[["p8","p9","f9"]]
+    logger.info("Finish Data load")
     
     res = {}
+    
     if "isolateForest" in method:
+        from sklearn.ensemble import IsolationForest
         isomodel= IsolationForest(n_estimators=100, 
                       max_samples='auto', 
                       contamination=float(0.01),
                       random_state=42
                      )
-
         isomodel.fit(data)
         score = isomodel.fit_predict(data)
         res_iso = [i for i in range(len(score)) if score[i] == -1]
         res["isolateForest"] = getRes(res_iso, start)
         logger.info("Finish Isolate Forest")
+    
+    if "kmeans" in method:
+        from kmeans import KMeansAD
+        detector = KMeansAD(k=20,n_jobs=1,stride=1,window_size=20)
+        scores = detector.fit_predict(data)
+        resKmeans = [i for i in range(len(scores)) if scores[i]>10]
+        res["kmeans"] = getRes(resKmeans, start)
+        logger.info("Finish Kmeans")
+    
+    if "knn" in method:
+        from pyod.models.knn import KNN
+        clf = KNN(
+        # n_neighbors=5,
+        # method="largest",
+        # radius=1.0,
+        # leaf_size=30,
+        # n_jobs=1,
+        # algorithm="auto",
+        # metric=2,
+        # metric_params=None,
+        # p=2,
+        )
+        clf.fit(data)
+        scores = clf.decision_scores_
+        resKNN = [i for i in range(len(scores)) if scores[i]>0]
+        res["knn"] = getRes(resKNN, start)
+        logger.info("Finish knn")
+    
+    if "lstm" in method:
+        from lstm_ad.model import LSTMAD
+        # 修改模型路径为相对路径
+        model_path = os.path.join(os.path.dirname(__file__), "lstm_res", "1344.pt")
+        model = LSTMAD.load(path = model_path,
+                            input_size=data.shape[1],
+                            lstm_layers=2,
+                             split=0.9,
+                             window_size=30,
+                             prediction_window_size=1,
+                             output_dims=[],
+                             batch_size=32,
+                             validation_batch_size=128,
+                             test_batch_size=128,
+                             epochs=50,
+                             early_stopping_delta=0.05,
+                             early_stopping_patience=10,
+                             optimizer='adam',
+                             learning_rate=0.001,
+                             random_state=42)
+        scores = model.anomaly_detection(data)
+        resLstm = [i for i in range(len(scores)) if scores[i]>3]
+        res["lstm"] = getRes(resLstm, start)
+        logger.info("Finish LSTM-ad")
 
     # 如果需要保存到CSV
     if save_to_csv and res:

@@ -48,23 +48,27 @@
                     
                     <!-- 标注选择器 -->
                     <div class="mb-6">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">异常标注</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">特征现象</label>
                         <div class="space-y-2">
                             <label class="flex items-center">
                                 <input type="checkbox" id="anno-checkbox" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
-                                <span class="text-sm text-gray-700">异常事件标注</span>
+                                <span class="text-sm text-gray-700">原始特征现象</span>
                             </label>
                             <label class="flex items-center">
                                 <input type="checkbox" id="iforest-checkbox" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded" checked>
-                                <span class="text-sm text-gray-700">iForest异常检测</span>
+                                <span class="text-sm text-gray-700">iForest特征现象检测</span>
                             </label>
                             <label class="flex items-center">
                                 <input type="checkbox" id="kmean-checkbox" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                <span class="text-sm text-gray-700">K-Means聚类异常</span>
+                                <span class="text-sm text-gray-700">K-Means特征现象检测</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="knn-checkbox" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <span class="text-sm text-gray-700">KNN特征现象检测</span>
                             </label>
                             <label class="flex items-center">
                                 <input type="checkbox" id="lstm-ad-checkbox" class="mr-2 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                <span class="text-sm text-gray-700">LSTM异常检测</span>
+                                <span class="text-sm text-gray-700">LSTM特征现象检测</span>
                             </label>
                         </div>
                     </div>
@@ -110,10 +114,24 @@
                 trigger: 'axis',  // 坐标轴触发
                 axisPointer: {
                     animation: false  // 关闭动画以提高性能
+                },
+                formatter: function(params) {
+                    // 自定义tooltip格式，显示各个指标的数值和单位
+                    let result = params[0].axisValue + '<br/>';
+                    params.forEach(function(item) {
+                        let unit = '';
+                        if (item.seriesName.includes('压力') || item.seriesName.includes('压')) {
+                            unit = ' MPa';
+                        } else if (item.seriesName.includes('流量')) {
+                            unit = ' m³/h';
+                        }
+                        result += item.marker + item.seriesName + ': ' + item.value + unit + '<br/>';
+                    });
+                    return result;
                 }
             },
             legend: {
-                // 图例数据，对应各个数据系列
+                // 图例数据，对应各个数据系列（不包括隐藏的标注层）
                 data: ['8井油压', '8井套压', '9井压力', '9井流量', '8/9井压力差值']
             },
             xAxis: {
@@ -121,61 +139,170 @@
                 data: [],  // 将由数据动态填充
                 name: '时间'  // 修改横轴名称为"时间"
             },
-            yAxis: {
-                type: 'value',
-                name: '数值'
-            },
+            // 配置多个Y轴
+            yAxis: [
+                {
+                    type: 'value',
+                    name: '8井油压 (MPa)',
+                    position: 'left',
+                    axisLine: {
+                        show: true,
+                        lineStyle: {
+                            color: '#5470c6'  // 与第一个系列颜色对应
+                        }
+                    },
+                    axisLabel: {
+                        formatter: '{value} MPa',
+                        color: '#5470c6'
+                    }
+                },
+                {
+                    type: 'value',
+                    name: '8井套压 (MPa)',
+                    position: 'left',
+                    offset: 80,  // 向左偏移80像素
+                    axisLine: {
+                        show: true,
+                        lineStyle: {
+                            color: '#91cc75'  // 与第二个系列颜色对应
+                        }
+                    },
+                    axisLabel: {
+                        formatter: '{value} MPa',
+                        color: '#91cc75'
+                    }
+                },
+                {
+                    type: 'value',
+                    name: '9井压力 (MPa)',
+                    position: 'right',
+                    axisLine: {
+                        show: true,
+                        lineStyle: {
+                            color: '#fac858'  // 与第三个系列颜色对应
+                        }
+                    },
+                    axisLabel: {
+                        formatter: '{value} MPa',
+                        color: '#fac858'
+                    }
+                },
+                {
+                    type: 'value',
+                    name: '9井流量 (m³/h)',
+                    position: 'right',
+                    offset: 80,  // 向右偏移80像素
+                    axisLine: {
+                        show: true,
+                        lineStyle: {
+                            color: '#ee6666'  // 与第四个系列颜色对应
+                        }
+                    },
+                    axisLabel: {
+                        formatter: '{value} m³/h',
+                        color: '#ee6666'
+                    }
+                },
+                {
+                    type: 'value',
+                    name: '压力差值 (MPa)',
+                    position: 'right',
+                    offset: 160,  // 向右偏移160像素
+                    axisLine: {
+                        show: true,
+                        lineStyle: {
+                            color: '#73c0de'  // 与第五个系列颜色对应
+                        }
+                    },
+                    axisLabel: {
+                        formatter: '{value} MPa',
+                        color: '#73c0de'
+                    }
+                }
+            ],
             animation: false,  // 关闭动画以提高大数据量时的性能
             series: [
-                // 8井油压数据系列
+                // 8井油压数据系列 - 使用第一个Y轴
                 { 
                     name: '8井油压', 
                     type: 'line', 
+                    yAxisIndex: 0,  // 指定使用第一个Y轴
                     data: [], 
                     showSymbol: false,      // 不显示数据点符号
                     sampling: 'lttb',       // 使用LTTB采样算法优化大数据量显示
                     large: true,            // 开启大数据量优化
-                    largeThreshold: 2000    // 大数据量阈值
+                    largeThreshold: 2000,   // 大数据量阈值
+                    lineStyle: {
+                        color: '#5470c6'
+                    }
                 },
-                // 8井套压数据系列
+                // 8井套压数据系列 - 使用第二个Y轴
                 { 
                     name: '8井套压', 
                     type: 'line', 
+                    yAxisIndex: 1,  // 指定使用第二个Y轴
                     data: [], 
                     showSymbol: false,
                     sampling: 'lttb',
                     large: true,
-                    largeThreshold: 2000
+                    largeThreshold: 2000,
+                    lineStyle: {
+                        color: '#91cc75'
+                    }
                 },
-                // 9井压力数据系列
+                // 9井压力数据系列 - 使用第三个Y轴
                 { 
                     name: '9井压力', 
                     type: 'line', 
+                    yAxisIndex: 2,  // 指定使用第三个Y轴
                     data: [], 
                     showSymbol: false,
                     sampling: 'lttb',
                     large: true,
-                    largeThreshold: 2000
+                    largeThreshold: 2000,
+                    lineStyle: {
+                        color: '#fac858'
+                    }
                 },
-                // 9井流量数据系列
+                // 9井流量数据系列 - 使用第四个Y轴
                 { 
                     name: '9井流量', 
                     type: 'line', 
+                    yAxisIndex: 3,  // 指定使用第四个Y轴
                     data: [], 
                     showSymbol: false,
                     sampling: 'lttb',
                     large: true,
-                    largeThreshold: 2000
+                    largeThreshold: 2000,
+                    lineStyle: {
+                        color: '#ee6666'
+                    }
                 },
-                // 8/9井压力差值数据系列
+                // 8/9井压力差值数据系列 - 使用第五个Y轴
                 { 
                     name: '8/9井压力差值', 
                     type: 'line', 
+                    yAxisIndex: 4,  // 指定使用第五个Y轴
                     data: [], 
                     showSymbol: false,
                     sampling: 'lttb',
                     large: true,
-                    largeThreshold: 2000
+                    largeThreshold: 2000,
+                    lineStyle: {
+                        color: '#73c0de'
+                    }
+                },  // 这里需要添加逗号！
+                // 添加专门用于标注的隐藏系列
+                {
+                    name: '标注层',
+                    type: 'line',
+                    data: [],
+                    showSymbol: false,
+                    lineStyle: {
+                        opacity: 0  // 完全透明，不显示线条
+                    },
+                    showInLegend: false,  // 不在图例中显示
+                    silent: true  // 不响应鼠标事件
                 }
             ],
             // 数据缩放组件，支持图表缩放和平移
@@ -193,7 +320,14 @@
                 }
             ],
             // 图形标注配置
-            graphic: []
+            graphic: [],
+            // 调整网格配置以适应多个Y轴
+            grid: {
+                left: 180,    // 增加左边距以容纳左侧Y轴
+                right: 280,   // 增加右边距以容纳右侧Y轴
+                top: 60,
+                bottom: 80
+            }
         };
         
         // 应用图表配置
@@ -292,7 +426,6 @@
         }
         
         // 存储当前的标注数据和原始时间数据
-// 删除重复声明的currentAnnotations变量，因为它已在前面声明过
         let currentTimeData = [];  // 新增：存储原始秒序号数据
         
         /**
@@ -305,13 +438,15 @@
             if (document.getElementById('anno-checkbox').checked) selectedTypes.push('anno');
             if (document.getElementById('iforest-checkbox').checked) selectedTypes.push('iforest');
             if (document.getElementById('kmean-checkbox').checked) selectedTypes.push('kmean');
+            if (document.getElementById('knn-checkbox').checked) selectedTypes.push('knn');
             if (document.getElementById('lstm-ad-checkbox').checked) selectedTypes.push('lstm-ad');
             
             console.log('选中的标注类型:', selectedTypes);
             
-            // 清除现有的标注
-            option.series[0].markArea = { data: [] };
-            option.series[0].markLine = { data: [] };
+            // 清除现有的标注 - 使用隐藏的标注层（索引5）
+            const annotationSeriesIndex = 5; // 标注层的索引
+            option.series[annotationSeriesIndex].markArea = { data: [] };
+            option.series[annotationSeriesIndex].markLine = { data: [] };
             
             if (selectedTypes.length === 0 || !currentAnnotations || currentAnnotations.length === 0) {
                 myChart.setOption(option, true);
@@ -367,6 +502,7 @@
                     'anno': '#0c1b25',
                     'iforest': '#4ecdc4', 
                     'kmean': '#45b7d1',
+                    'knn': '#f39c12',
                     'lstm-ad': '#96ceb4'
                 };
                 
@@ -414,13 +550,13 @@
                 }
             });
             
-            // 应用标注到图表
+            // 应用标注到隐藏的标注层
             if (markAreas.length > 0 || markLines.length > 0) {
-                option.series[0].markArea = {
+                option.series[annotationSeriesIndex].markArea = {
                     silent: true,
                     data: markAreas
                 };
-                option.series[0].markLine = {
+                option.series[annotationSeriesIndex].markLine = {
                     silent: true,
                     data: markLines
                 };

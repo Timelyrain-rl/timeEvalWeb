@@ -28,6 +28,7 @@ ANNO_DATA = None    # 存储异常标注数据
 IFOREST_DATA = None # 存储iForest异常检测数据
 KMEAN_DATA = None    # 存储K-Means异常检测数据
 LSTM_AD_DATA = None  # 存储LSTM异常检测数据
+KNN_DATA = None      # 存储KNN异常检测数据
 
 # 修改load_data_to_memory函数
 def load_data_to_memory():
@@ -40,7 +41,7 @@ def load_data_to_memory():
     Returns:
         bool: 数据加载是否成功
     """
-    global GLOBAL_DATA, DATE_RANGE, ANNO_DATA, IFOREST_DATA, KMEAN_DATA, LSTM_AD_DATA
+    global GLOBAL_DATA, DATE_RANGE, ANNO_DATA, IFOREST_DATA, KMEAN_DATA, LSTM_AD_DATA, KNN_DATA
     try:
         print("正在加载数据到内存...")
         # 读取主要数据CSV文件
@@ -69,7 +70,7 @@ def load_data_to_memory():
             IFOREST_DATA = pd.DataFrame()
         
         # 读取K-Means数据
-        kmean_file = os.path.join('timeEvalWebData', 'kmean.csv')
+        kmean_file = os.path.join('timeEvalWebData', 'kmeans.csv')
         if os.path.exists(kmean_file):
             KMEAN_DATA = pd.read_csv(kmean_file)
             KMEAN_DATA['日期'] = pd.to_datetime(KMEAN_DATA['日期']).dt.strftime('%Y-%m-%d')
@@ -87,6 +88,16 @@ def load_data_to_memory():
         else:
             LSTM_AD_DATA = pd.DataFrame()
             print("LSTM-AD数据文件不存在")
+        
+        # 读取KNN数据
+        knn_file = os.path.join('timeEvalWebData', 'knn.csv')
+        if os.path.exists(knn_file):
+            KNN_DATA = pd.read_csv(knn_file)
+            KNN_DATA['日期'] = pd.to_datetime(KNN_DATA['日期']).dt.strftime('%Y-%m-%d')
+            print(f"KNN数据加载成功: {len(KNN_DATA)} 条记录")
+        else:
+            KNN_DATA = pd.DataFrame()
+            print("KNN数据文件不存在")
         
         # 处理日期列：转换为标准格式并提取唯一日期
         if '日期' in GLOBAL_DATA.columns:
@@ -111,16 +122,8 @@ def load_data_to_memory():
 # 添加新的API接口获取标注数据
 @app.route('/get_annotations')
 def get_annotations():
-    """
-    获取指定日期的标注数据API接口
-    
-    根据日期参数返回该日期的异常标注和iForest检测结果。
-    
-    Returns:
-        Response: JSON格式的标注数据
-    """
     try:
-        if ANNO_DATA is None or IFOREST_DATA is None or KMEAN_DATA is None or LSTM_AD_DATA is None:
+        if ANNO_DATA is None or IFOREST_DATA is None or KMEAN_DATA is None or LSTM_AD_DATA is None or KNN_DATA is None:
             if not load_data_to_memory():
                 return jsonify({'error': '数据加载失败，请检查数据文件'})
         
@@ -133,6 +136,7 @@ def get_annotations():
         iforest_filtered = IFOREST_DATA[IFOREST_DATA['日期'] == date] if not IFOREST_DATA.empty else pd.DataFrame()
         kmean_filtered = KMEAN_DATA[KMEAN_DATA['日期'] == date] if not KMEAN_DATA.empty else pd.DataFrame()
         lstm_ad_filtered = LSTM_AD_DATA[LSTM_AD_DATA['日期'] == date] if not LSTM_AD_DATA.empty else pd.DataFrame()
+        knn_filtered = KNN_DATA[KNN_DATA['日期'] == date] if not KNN_DATA.empty else pd.DataFrame()
         
         # 处理标注数据
         annotations = []
@@ -199,6 +203,23 @@ def get_annotations():
             }
             annotations.append(annotation)
         
+        # 处理KNN中的标注
+        for _, row in knn_filtered.iterrows():
+            anomaly_type = str(row['异常类型']) if pd.notna(row['异常类型']) and str(row['异常类型']).strip() != '' else ''
+            if anomaly_type:
+                label = f'KNN-{anomaly_type}'
+            else:
+                label = 'KNN'
+            
+            annotation = {
+                'type': 'knn',
+                'start': int(row['每日对应秒序号起始']) if pd.notna(row['每日对应秒序号起始']) else None,
+                'end': int(row['每日对应秒序号结束']) if pd.notna(row['每日对应秒序号结束']) else None,
+                'label': label,
+                'date': row['日期']
+            }
+            annotations.append(annotation)
+        
         return jsonify({'annotations': annotations})
     except Exception as e:
         print(f"获取标注数据时出错: {e}")
@@ -213,13 +234,14 @@ def cleanup():
     
     释放内存中的数据，确保应用优雅关闭。
     """
-    global GLOBAL_DATA, DATE_RANGE, ANNO_DATA, IFOREST_DATA, KMEAN_DATA, LSTM_AD_DATA
+    global GLOBAL_DATA, DATE_RANGE, ANNO_DATA, IFOREST_DATA, KMEAN_DATA, LSTM_AD_DATA, KNN_DATA
     GLOBAL_DATA = None
     DATE_RANGE = None
     ANNO_DATA = None
     IFOREST_DATA = None
     KMEAN_DATA = None
     LSTM_AD_DATA = None
+    KNN_DATA = None
     print("应用关闭，内存已清理")
 
 def get_filtered_data(date, start_hour, end_hour, start_minute, end_minute):
