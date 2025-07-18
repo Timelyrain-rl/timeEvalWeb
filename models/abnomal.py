@@ -355,7 +355,7 @@ def ab(start:int, end:int, method:list, save_to_csv=True):
         from sklearn.ensemble import IsolationForest
         isomodel= IsolationForest(n_estimators=100, 
                       max_samples='auto', 
-                      contamination=float(0.01),
+                      contamination=float(0.05),
                       random_state=42
                      )
         isomodel.fit(data)
@@ -375,7 +375,7 @@ def ab(start:int, end:int, method:list, save_to_csv=True):
     if "knn" in method:
         from pyod.models.knn import KNN
         clf = KNN(
-        # n_neighbors=5,
+        n_neighbors=60,
         # method="largest",
         # radius=1.0,
         # leaf_size=30,
@@ -387,34 +387,60 @@ def ab(start:int, end:int, method:list, save_to_csv=True):
         )
         clf.fit(data)
         scores = clf.decision_scores_
-        resKNN = [i for i in range(len(scores)) if scores[i]>0]
+        resKNN = [i for i in range(len(scores)) if scores[i]>0.005]
         res["knn"] = getRes(resKNN, start)
         logger.info("Finish knn")
     
     if "lstm" in method:
-        from lstm_ad.model import LSTMAD
-        # 修改模型路径为相对路径
-        model_path = os.path.join(os.path.dirname(__file__), "lstm_res", "1344.pt")
-        model = LSTMAD.load(path = model_path,
-                            input_size=data.shape[1],
-                            lstm_layers=2,
-                             split=0.9,
-                             window_size=30,
-                             prediction_window_size=1,
-                             output_dims=[],
-                             batch_size=32,
-                             validation_batch_size=128,
-                             test_batch_size=128,
-                             epochs=50,
-                             early_stopping_delta=0.05,
-                             early_stopping_patience=10,
-                             optimizer='adam',
-                             learning_rate=0.001,
-                             random_state=42)
-        scores = model.anomaly_detection(data)
-        resLstm = [i for i in range(len(scores)) if scores[i]>3]
-        res["lstm"] = getRes(resLstm, start)
-        logger.info("Finish LSTM-ad")
+        try:
+            from lstm_ad.model import LSTMAD
+            # 修改模型路径为相对路径
+            model_path = os.path.join(os.path.dirname(__file__), "lstm_res", "0716.pt")
+            
+            # 临时修改torch.load以兼容PyTorch 2.6+
+            import torch
+            original_load = torch.load
+            
+            def safe_load(path, **kwargs):
+                try:
+                    # 首先尝试安全加载
+                    return original_load(path, weights_only=True, **kwargs)
+                except Exception:
+                    # 如果失败，使用传统方式加载
+                    logger.warning(f"安全加载失败，使用传统方式加载模型: {path}")
+                    return original_load(path, weights_only=False, **kwargs)
+            
+            # 临时替换torch.load
+            torch.load = safe_load
+            
+            try:
+                model = LSTMAD.load(path = model_path,
+                                    input_size=data.shape[1],
+                                    lstm_layers=2,
+                                     split=0.9,
+                                     window_size=30,
+                                     prediction_window_size=1,
+                                     output_dims=[],
+                                     batch_size=32,
+                                     validation_batch_size=128,
+                                     test_batch_size=128,
+                                     epochs=50,
+                                     early_stopping_delta=0.05,
+                                     early_stopping_patience=10,
+                                     optimizer='adam',
+                                     learning_rate=0.001,
+                                     random_state=42)
+                scores = model.anomaly_detection(data)
+                resLstm = [i for i in range(len(scores)) if scores[i]>3]
+                res["lstm"] = getRes(resLstm, start)
+                logger.info("Finish LSTM-ad")
+            finally:
+                # 恢复原始的torch.load
+                torch.load = original_load
+                
+        except Exception as e:
+            logger.error(f"LSTM异常检测失败: {e}")
+            res["lstm"] = []  # 返回空结果而不是让整个程序崩溃
 
     # 如果需要保存到CSV
     if save_to_csv and res:

@@ -1,6 +1,6 @@
 from lstm_ad.model  import LSTMAD
 import pandas as pd
-
+import os
 
 import logging
 logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(levelname)s - %(message)s')
@@ -8,8 +8,9 @@ logger = logging.getLogger(__name__)
 
 
 def trainLSTM(path,start,end):
-    df = pd.read_csv("../data1.csv")
-    df = df[["date","8井油压","9井压力","9井排量"]]
+    file_path = os.path.join(os.path.dirname(__file__), "..", "timeEvalWebData", "month_3_processed.csv")
+    df = pd.read_csv(file_path)
+    df = df[["记录仪时间","8井油压","9井压力","9井流量"]]
     df.columns = ["date","p8","p9","f9"]
     data = df.fillna(method='pad',axis=0)
     data = data.reset_index()
@@ -40,5 +41,5 @@ def trainLSTM(path,start,end):
 
 
 if __name__ == "__main__":
-    trainLSTM("/home/lili/yantu/abnormal/lstm_res/0716.pt",0,800000)
+    trainLSTM("./lstm_res/0716.pt",0,800000)
     

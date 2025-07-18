@@ -49,7 +49,7 @@ def load_data_to_memory():
         
         # 读取标注数据
         anno_file = os.path.join('timeEvalWebData', 'anno_data.csv')
-        iforest_file = os.path.join('timeEvalWebData', 'iForest.csv')
+        iforest_file = os.path.join('timeEvalWebData', 'isolateForest.csv')
         
         if os.path.exists(anno_file):
             ANNO_DATA = pd.read_csv(anno_file)
